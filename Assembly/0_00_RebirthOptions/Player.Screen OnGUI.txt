@@ -1,0 +1,266 @@
+using System;
+using UnityEngine;
+
+// Token: 0x020006C8 RID: 1736
+public class PlayerScreen : UIScreen
+{
+	// Token: 0x060030F5 RID: 12533
+	public PlayerScreen()
+	{
+	}
+
+	// Token: 0x060030F6 RID: 12534
+	public override void OnStart()
+	{
+		this.button1 = new Rect((float)Screen.width * 0.07f, (float)Screen.height * 0.375f, 100f, 100f);
+		this.button2 = new Rect((float)Screen.width * 0.25f, (float)Screen.height * 0.375f, 100f, 100f);
+		this.button3 = new Rect((float)Screen.width * 0.07f, (float)Screen.height * 0.395f, 100f, 100f);
+		this.button4 = new Rect((float)Screen.width * 0.25f, (float)Screen.height * 0.395f, 100f, 100f);
+		this.button5 = new Rect((float)Screen.width * 0.05f, (float)Screen.height * 0.1f, 200f, 900f);
+		this.button6 = new Rect((float)Screen.width * 0.16f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button7 = new Rect((float)Screen.width * 0.27f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button8 = new Rect((float)Screen.width * 0.38f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button9 = new Rect((float)Screen.width * 0.49f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button10 = new Rect((float)Screen.width * 0.6f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button11 = new Rect((float)Screen.width * 0.71f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button12 = new Rect((float)Screen.width * 0.82f, (float)Screen.height * 0.1f, 200f, 100f);
+		this.button13 = new Rect((float)Screen.width * 0.16f, (float)Screen.height * 0.21f, 200f, 100f);
+		this.button14 = new Rect((float)Screen.width * 0.27f, (float)Screen.height * 0.21f, 200f, 100f);
+		this.button15 = new Rect((float)Screen.width * 0.38f, (float)Screen.height * 0.21f, 200f, 100f);
+		this.guistyle = new GUIStyle();
+		this.guistyle2 = new GUIStyle();
+		base.OnStart();
+		this.playerWidget.OnStart();
+	}
+
+	// Token: 0x060030F7 RID: 12535
+	public override void OnEnter()
+	{
+		base.OnEnter();
+		DLCManager dlcManager = App.instance.dlcManager;
+		dlcManager.OnOwnedDlcChanged = (Action)Delegate.Combine(dlcManager.OnOwnedDlcChanged, new Action(this.jobsWidget.Setup));
+		base.showNavigationBars = true;
+		this.mPlayer = Game.instance.player;
+		bool flag = !this.mPlayer.IsUnemployed();
+		this.playerWidget.Setup(this.mPlayer);
+		this.statsWidget.Setup(this.mPlayer);
+		this.careerWidget.Setup(this.mPlayer);
+		this.trophiesWidget.Setup(this.mPlayer);
+		this.jobsWidget.Setup();
+		GameUtility.SetActive(this.notificationsWidget.gameObject, !flag);
+		GameUtility.SetActive(this.applicationsWidget.gameObject, this.mPlayer.jobApplications.Count > 0);
+		GameUtility.SetActive(this.chairmanWidget.gameObject, flag);
+		if (!flag)
+		{
+			this.notificationsWidget.Setup();
+		}
+		else
+		{
+			this.chairmanWidget.Setup(this.mPlayer);
+		}
+		if (this.applicationsWidget.gameObject.activeSelf)
+		{
+			this.applicationsWidget.Setup();
+		}
+		scSoundManager.Instance.PlaySound(SoundID.Sfx_TransitionHome, 0f);
+	}
+
+	// Token: 0x060030F8 RID: 12536
+	public override void OnExit()
+	{
+		base.OnExit();
+		this.notificationsWidget.OnExit();
+		DLCManager dlcManager = App.instance.dlcManager;
+		dlcManager.OnOwnedDlcChanged = (Action)Delegate.Remove(dlcManager.OnOwnedDlcChanged, new Action(this.jobsWidget.Setup));
+	}
+
+	// Token: 0x060030F9 RID: 12537
+	public void OnGUI()
+	{
+		this.guistyle.alignment = TextAnchor.MiddleCenter;
+		this.guistyle.normal.textColor = Color.grey;
+		this.guistyle.fontSize = 14;
+		this.guistyle2.alignment = TextAnchor.MiddleCenter;
+		this.guistyle2.normal.textColor = Color.white;
+		this.guistyle2.fontSize = 15;
+		GUI.Button(this.button1, "Player Salary ", this.guistyle);
+		GUI.Button(this.button2, "Player Networth", this.guistyle);
+		GUI.Button(this.button3, "£" + Game.instance.player.playerSalary.ToString(), this.guistyle2);
+		GUI.Button(this.button4, "£" + Game.instance.player.playerMoney.ToString(), this.guistyle2);
+		if (Game.instance.player.rebirthDebug)
+		{
+			GUI.Button(this.button5, string.Concat(new string[]
+			{
+				"Debug Menu : ",
+				Game.instance.player.rebirthDebug.ToString(),
+				"\n",
+				Game.instance.player.managementBuyoutmanagementBuyoutOn,
+				"\n",
+				Game.instance.player.managementBuyoutMainText + " " + Game.instance.player.managementBuyoutSubtext,
+				"\n",
+				Game.instance.player.managementBuyoutLogoStyle.ToString(),
+				"\n",
+				Game.instance.player.managementBuyoutPrimaryColour,
+				"\n",
+				Game.instance.player.managementBuyoutSecondaryColour,
+				"\n Player Net Worth ",
+				Game.instance.player.playerMoney.ToString(),
+				"\n Player Salary ",
+				Game.instance.player.playerSalary.ToString(),
+				"\n Current Team Net Worth \n",
+				(Game.instance.player.team.GetStarsStat() * Game.instance.player.team.GetStarsStat() * 2000000f).ToString()
+			}));
+			if (GUI.Button(this.button6, "Fire Player"))
+			{
+				Game.instance.MakePlayerUnemployed();
+			}
+			if (GUI.Button(this.button7, "Fire & Rehire Player"))
+			{
+				Team team = Game.instance.player.team;
+				Game.instance.MakePlayerUnemployed();
+				Game.instance.MakePlayerEmployed(team);
+			}
+			if (GUI.Button(this.button8, "ManagementBuyout"))
+			{
+				Game.instance.player.team.customLogo.teamFirstName = Game.instance.player.managementBuyoutMainText;
+				Game.instance.player.team.customLogo.teamLasttName = Game.instance.player.managementBuyoutSubtext;
+				Game.instance.player.team.name = Game.instance.player.managementBuyoutFullname;
+				Game.instance.player.team.customLogo.styleID = Game.instance.player.managementBuyoutLogoStyle - 1;
+				Game.instance.player.team.GetTeamColor().customLogoColor.primary = Game.instance.player.team.GetTeamColor().livery.primary;
+				Game.instance.player.team.GetTeamColor().customLogoColor.secondary = Game.instance.player.team.GetTeamColor().livery.secondary;
+				Game.instance.player.hasCreatedTeam = true;
+				Game.instance.player.createdTeamID = Game.instance.player.team.teamID;
+				Game.instance.player.team.isCreatedByPlayer = true;
+				MovieScreen screen = UIManager.instance.GetScreen<MovieScreen>();
+				screen.PlayTeamMovie(SoundID.Video_TeamLogo, Game.instance.player.team.teamID);
+				screen.SetNextScreen("PlayerScreen", 1.5f, null);
+				UIManager.instance.ChangeScreen("MovieScreen", UIManager.ScreenTransition.None, 0f, null, UIManager.NavigationType.Normal);
+				Game.instance.player.team.HandleChairmanRetirementRequest(Game.instance.player.team.chairman);
+				UIManager.instance.ClearNavigationStacks();
+				Game.instance.player.team.chairman.ModifyHappiness(100f, "Happy to invest in the team");
+			}
+			if (GUI.Button(this.button9, "Skip Race Weekends: " + Game.instance.player.skipraceweekends.ToString()))
+			{
+				Game.instance.player.skipraceweekends = !Game.instance.player.skipraceweekends;
+			}
+			if (GUI.Button(this.button10, string.Concat(new string[]
+			{
+				"Team Rebrand : \n",
+				Game.instance.player.team.championship.preSeasonStartDate.ToString(),
+				"\n",
+				Game.instance.player.team.championship.preSeasonEndDate.ToString(),
+				"\n",
+				Game.instance.player.team.championship.preSeasonStartDate.CompareTo(Game.instance.player.team.championship.preSeasonEndDate).ToString(),
+				"\n",
+				Game.instance.player.team.championship.preSeasonEndDate.CompareTo(Game.instance.player.team.championship.preSeasonStartDate).ToString()
+			})))
+			{
+				Game.instance.teamManager.TeamRebrand();
+			}
+			if (GUI.Button(this.button11, "Add Money To Player"))
+			{
+				Game.instance.player.playerMoney += 1000000L;
+			}
+			if (GUI.Button(this.button12, "Invest in Team"))
+			{
+				long num = (long)Mathf.FloorToInt((float)Game.instance.player.playerMoney * 0.5f);
+				float inHappiness = Mathf.Max(20f, Mathf.Floor((float)Game.instance.player.playerMoney * 0.5f) / 1000000f);
+				Game.instance.player.team.chairman.ModifyHappiness(inHappiness, "Pleased you invested in the team");
+				Transaction transaction = new Transaction(Transaction.Group.GlobalMotorsport, Transaction.Type.Credit, num, "Investment from " + Game.instance.player.firstName + " " + Game.instance.player.lastName);
+				Game.instance.player.team.financeController.finance.ProcessTransactions(null, null, true, new Transaction[]
+				{
+					transaction
+				});
+				Game.instance.player.playerMoney -= num;
+			}
+			if (GUI.Button(this.button13, "Breakthrough"))
+			{
+				Game.instance.player.team.carManager.carPartDesign.SetSeasonStartingStats();
+			}
+			if (GUI.Button(this.button14, "AdaptParts"))
+			{
+				Game.instance.teamManager.AdaptPartsForNewSeasonsRebrand(2f, 2f, Game.instance.player.team, true, false, CarPart.PartType.Brakes);
+			}
+			Game.instance.player.IsUnemployed();
+			GUI.Button(this.button15, Game.instance.player.team.carManager.GetCar(0).ChassisStats.supplierBrakes.name);
+		}
+	}
+
+	// Token: 0x04002CDA RID: 11482
+	public UIPlayerWidget playerWidget;
+
+	// Token: 0x04002CDB RID: 11483
+	public UIPlayerStatsWidget statsWidget;
+
+	// Token: 0x04002CDC RID: 11484
+	public UIPlayerNotificationsWidget notificationsWidget;
+
+	// Token: 0x04002CDD RID: 11485
+	public UIPlayerHappinessWidget chairmanWidget;
+
+	// Token: 0x04002CDE RID: 11486
+	public UIPlayerAvailableJobsWidget jobsWidget;
+
+	// Token: 0x04002CDF RID: 11487
+	public UIPlayerJobApplicationsWidget applicationsWidget;
+
+	// Token: 0x04002CE0 RID: 11488
+	public PersonCareerWidget careerWidget;
+
+	// Token: 0x04002CE1 RID: 11489
+	public UIPlayerTrophiesWidget trophiesWidget;
+
+	// Token: 0x04002CE2 RID: 11490
+	private Player mPlayer;
+
+	// Token: 0x04004EE3 RID: 20195
+	private Rect button1;
+
+	// Token: 0x04004EE4 RID: 20196
+	private Rect button2;
+
+	// Token: 0x04004EE5 RID: 20197
+	private Rect button3;
+
+	// Token: 0x04004EE6 RID: 20198
+	private Rect button4;
+
+	// Token: 0x04004EE7 RID: 20199
+	private Rect button5;
+
+	// Token: 0x04004EE8 RID: 20200
+	private Rect button6;
+
+	// Token: 0x04004EE9 RID: 20201
+	private Rect button7;
+
+	// Token: 0x04004EEA RID: 20202
+	private Rect button8;
+
+	// Token: 0x04004EEB RID: 20203
+	private Rect button9;
+
+	// Token: 0x04004EEC RID: 20204
+	private Rect button10;
+
+	// Token: 0x04004EED RID: 20205
+	private Rect button11;
+
+	// Token: 0x04004EEE RID: 20206
+	private Rect button12;
+
+	// Token: 0x04004EEF RID: 20207
+	private Rect button13;
+
+	// Token: 0x04004EF0 RID: 20208
+	private Rect button14;
+
+	// Token: 0x04004EF1 RID: 20209
+	private Rect button15;
+
+	// Token: 0x04004EF2 RID: 20210
+	private GUIStyle guistyle;
+
+	// Token: 0x04004EF3 RID: 20211
+	private GUIStyle guistyle2;
+}

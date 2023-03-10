@@ -1,0 +1,46 @@
+using System;
+using System.Collections.Generic;
+using FullSerializer;
+
+// Token: 0x020002B4 RID: 692
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public partial class TeamManager : GenericManager<Team>
+{
+	// Token: 0x06004D7C RID: 19836
+	public void GameStartRebrand()
+	{
+		EntityManager entityManager = Game.instance.entityManager;
+		List<DatabaseEntry> teamData = App.instance.database.teamData;
+		RandomUtility.GetRandom01();
+		int otherTeams = (teamData[0].GetIntValue("Opinions - Manager")); 
+		
+			for (int i = 0; i < Game.instance.player.startRebrandNumber; i++)
+			{
+				int randomInc = RandomUtility.GetRandomInc(0, 61 + otherTeams);
+				int num = RandomUtility.GetRandom(0, teamData.Count);
+				for (int j = 0; j < 62 + otherTeams; j++)
+				{
+					if (num == base.GetEntity(j).teamID)
+					{
+						num = j;
+						i--;
+					}
+				}
+				base.GetEntity(randomInc).name = teamData[num].GetStringValue("Name");
+				base.GetEntity(randomInc).oldname = base.GetEntity(randomInc).name;
+				base.GetEntity(randomInc).locationID = teamData[num].GetStringValue("Location ID");
+				base.GetEntity(randomInc).colorID = teamData[num].GetIntValue("Color");
+				base.GetEntity(randomInc).liveryID = teamData[num].GetIntValue("Livery");
+				base.GetEntity(randomInc).nationality = Nationality.GetNationalityByName(teamData[num].GetStringValue("Location"));
+				base.GetEntity(randomInc).headquarters.nationality = Nationality.GetNationalityByName(teamData[num].GetStringValue("Location"));
+				base.GetEntity(randomInc).teamID = num;
+				base.GetEntity(randomInc).aggression = teamData[num].GetFloatValue("Aggression");
+				base.GetEntity(randomInc).fanBase = teamData[num].GetFloatValue("Fan Base");
+				base.GetEntity(randomInc).votingCharacteristics = this.GetCharacteristics(teamData[num].GetStringValue("Political Attributes"));
+				base.GetEntity(randomInc).financeController.availableFunds = (long)(teamData[num].GetFloatValue("Budget") * 1000000f);
+				base.GetEntity(randomInc).customStartDescription = teamData[num].GetStringValue("Custom Start Description");
+				base.GetEntity(randomInc).SetTeamStartDescriptionID(teamData[num].GetStringValue("Team Start Description"));
+			}
+		
+	}
+}

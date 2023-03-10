@@ -1,0 +1,43 @@
+using System;
+using FullSerializer;
+using UnityEngine;
+
+// Token: 0x02000449 RID: 1097
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public partial class AISpinBehaviour : AIRacingBehaviour
+{
+	// Token: 0x06001F94 RID: 8084 RVA: 0x000E120C File Offset: 0x000DF40C
+	
+		public override void SimulationUpdate()
+	{
+		this.SetTarget();
+		switch (this.mState)
+		{
+		case AISpinBehaviour.SpinState.SpiningOut:
+			this.mTimer += GameTimer.simulationDeltaTime;
+			if (this.mRacingVehicle.HasStopped())
+			{
+				this.SetState(AISpinBehaviour.SpinState.Refocus);
+				this.mRacingVehicle.unityVehicle.ActivateCrashParticleEffect(PathData.GateParticleType.TyreWhiteSmoke, false);
+			}
+			break;
+		case AISpinBehaviour.SpinState.Refocus:
+			this.mTimer += GameTimer.simulationDeltaTime;
+			if (this.mTimer > this.mRecoveryTime)
+			{
+				this.SetState(AISpinBehaviour.SpinState.GoBackToTrack);
+			}
+			break;
+		case AISpinBehaviour.SpinState.GoBackToTrack:
+			if (this.mQueuedBehaviour == null)
+			{
+				this.mRacingVehicle.behaviourManager.ReturnToPreviousBehaviour();
+			}
+			else
+			{
+				this.mRacingVehicle.behaviourManager.ChangeBehaviour(this.mQueuedBehaviour.behaviourType);
+			}
+			break;
+		}
+	}
+}

@@ -1,0 +1,12 @@
+
+case "EngineReliability":
+this.ModifyPartStat(CarPartStats.CarPartStat.Reliability, CarPart.PartType.Engine, inUserData.mCriteriaInfo, inDilemmaData);
+	
+	to
+
+
+case "NewPartReliability":
+edit 43
+
+this.ModifyPartStat(CarPartStats.CarPartStat.Reliability, StringVariableParser.partFrontendUI, inUserData.mCriteriaInfo, inDilemmaData);	 
+move 179 to replace 187  

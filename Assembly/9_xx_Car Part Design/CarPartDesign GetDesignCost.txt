@@ -1,0 +1,31 @@
+// This is to reduce AI cost problems
+
+using System;
+using System.Collections.Generic;
+using FullSerializer;
+using UnityEngine;
+
+// Token: 0x020000FE RID: 254
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public partial class CarPartDesign
+{
+	// Token: 0x060005D7 RID: 1495 RVA: 0x00050C40 File Offset: 0x0004EE40
+public int GetDesignCost()
+{
+	if (this.mTeam.IsPlayersTeam())
+	{
+		float num = Game.instance.partSettingsManager.championshipPartSettings[this.mTeam.championship.championshipID][this.mCarPart.GetPartType()].materialsCost;
+		num += (float)this.GetComponentDesignCostBonus();
+		num = Math.Max(0f, num);
+		return Mathf.RoundToInt(num);
+	}
+	if (!this.mTeam.IsPlayersTeam())
+	{
+		float num2 = Game.instance.partSettingsManager.championshipPartSettings[this.mTeam.championship.championshipID][this.mCarPart.GetPartType()].materialsCost * 0.1f;
+		num2 += (float)this.GetComponentDesignCostBonus();
+		num2 = Math.Max(0f, num2);
+		return Mathf.RoundToInt(num2);
+	}
+	return 0;
+}
+}

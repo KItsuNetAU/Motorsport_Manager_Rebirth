@@ -1,0 +1,35 @@
+using System;
+using FullSerializer;
+using UnityEngine;
+
+// Token: 0x02000474 RID: 1140
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public partial class DriverPerformance : PerformanceImpact
+{
+	// Token: 0x0600212B RID: 8491 RVA: 0x000E6C78 File Offset: 0x000E4E78
+	public override void SimulationUpdate(float inDeltaTime)
+	{
+		base.SimulationUpdate(inDeltaTime);
+		this.ClearTimeCost();
+		DriverStats driverStats = this.mVehicle.driver.GetDriverStats();
+		if (this.mStatsPartBonuses != null)
+		{
+			driverStats += this.mStatsPartBonuses;
+		}
+		float num = 1f - driverStats.GetUnitAverage();
+			float num2 = (1f - Mathf.Clamp01(driverStats.experience)) * 2f;
+		ChampionshipRules rules = this.mVehicle.championship.rules;
+		if (rules.driverAidsOn)
+		{
+			base.IncreaseTimeCost(this.mCarPerformance.driverPerformance.maxDriverTimeCostWithDriverAidsOn * num + num2);
+		}
+		else
+		{
+			base.IncreaseTimeCost(this.mCarPerformance.driverPerformance.maxDriverTimeCostWithDriverAidsOff * num + num2);
+		}
+		if (this.mVehicle.championship.series == Championship.Series.EnduranceSeries)
+		{
+			base.IncreaseTimeCost(this.mDriverSetupPreferences.GetTimeCostForDriver(this.mVehicle.driver, this.mVehicle.carID));
+		}
+	}
+}

@@ -1,0 +1,24 @@
+using System;
+using TMPro;
+using UnityEngine;
+
+// Token: 0x020005D2 RID: 1490
+public partial class UIDialogBoxMechanicBonusTooltip : UIDialogBox
+{
+	// Token: 0x06002AD0 RID: 10960
+	public void ShowTooltip(bool inUnlocked, MechanicBonus inBonus)
+	{
+		if (inBonus != null && (inUnlocked || Game.instance.player.mechanicBonusHide == 0))
+		{
+			this.mBonus = inBonus;
+			GameUtility.SetTooltipTransformInsideScreen(this.rectTransform, null, default(Vector3), false, null);
+			this.icon.SetComponent(this.mBonus);
+			StringVariableParser.intValue1 = this.mBonus.level;
+			this.level.text = Localisation.LocaliseID("PSG_10010415", null);
+			this.title.text = (string.IsNullOrEmpty(this.mBonus.nameLocalisationID) ? "-" : Localisation.LocaliseID(this.mBonus.nameLocalisationID, null));
+			this.description.text = (string.IsNullOrEmpty(this.mBonus.textLocalisationID) ? "-" : Localisation.LocaliseID(this.mBonus.textLocalisationID, null));
+			GameUtility.SetActive(this.locked, !inUnlocked);
+			GameUtility.SetActive(base.gameObject, true);
+		}
+	}
+}

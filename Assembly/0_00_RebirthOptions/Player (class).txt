@@ -1,0 +1,631 @@
+using System;
+using System.Collections.Generic;
+using System.IO;
+using FullSerializer;
+using MM2;
+using UnityEngine;
+
+// Token: 0x0200023A RID: 570
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public class Player : TeamPrincipal
+{
+	// Token: 0x0600109F RID: 4255
+	public Player()
+	{
+	}
+
+	// Token: 0x060010A0 RID: 4256
+	static Player()
+	{
+	}
+
+	// Token: 0x060010A1 RID: 4257
+	public void LoadDefaultsFromDatabase(Database inDatabase)
+	{
+		this.LoadDefaultsEntry(ref Player.defaultData, inDatabase.playerDefaultsData[0]);
+	}
+
+	// Token: 0x060010A2 RID: 4258
+	public void SetToDefault()
+	{
+		base.SetName(string.Empty, string.Empty);
+		this.SetDefaults(Player.defaultData);
+	}
+
+	// Token: 0x060010A3 RID: 4259
+	public void OnStartingGame()
+	{
+		GameTimer time = Game.instance.time;
+		time.OnWeekEnd = (Action)Delegate.Combine(time.OnWeekEnd, new Action(this.OnWeekEnd));
+		this.AddStartMonthCalendarEvent();
+	}
+
+	// Token: 0x060010A4 RID: 4260
+	public override void OnLoad()
+	{
+		base.OnLoad();
+		GameTimer time = Game.instance.time;
+		time.OnWeekEnd = (Action)Delegate.Combine(time.OnWeekEnd, new Action(this.OnWeekEnd));
+		if (this.playerGameData == null)
+		{
+			this.playerGameData = new PlayerGameData();
+			for (int i = 0; i < this.careerHistory.career.Count; i++)
+			{
+				this.playerGameData.UpdateData(this.careerHistory.career[i].championship);
+			}
+		}
+		this.LoadOptions();
+	}
+
+	// Token: 0x060010A5 RID: 4261
+	public void SetPlayerBackStoryType(PlayerBackStory.PlayerBackStoryType inBackStory)
+	{
+		this.mPlayerBackStory.playerBackStory = inBackStory;
+	}
+
+	// Token: 0x060010A6 RID: 4262
+	public override PersonStats GetStats()
+	{
+		return new PersonStats();
+	}
+
+	// Token: 0x060010A7 RID: 4263
+	public void AddRaceManagement(int inPositionDiff)
+	{
+		if (Game.IsActive() && !this.IsUnemployed())
+		{
+			float num = Mathf.Min(Player.raceManagementStatPositionMultiplier + (float)Mathf.Abs(inPositionDiff) * Player.raceManagementStatPositionMultiplier, Player.raceManagementStatMaxChange);
+			float value = this.stats.raceManagement + ((inPositionDiff < 0) ? (-num) : num);
+			this.stats.raceManagement = Mathf.Clamp(value, 0f, 20f);
+		}
+	}
+
+	// Token: 0x060010A8 RID: 4264
+	public void ApplyLoyaltyChange(Player.LoyaltyChange inChange)
+	{
+		if (Game.IsActive() && !this.IsUnemployed())
+		{
+			if (inChange != Player.LoyaltyChange.FiringTeamMember)
+			{
+				if (inChange == Player.LoyaltyChange.ApplyingOtherTeam)
+				{
+					float value = this.stats.loyalty - Player.loyaltyStatPenaltyForApplyingOtherTeam;
+					this.stats.loyalty = Mathf.Clamp(value, 0f, 20f);
+					return;
+				}
+			}
+			else
+			{
+				float value2 = this.stats.loyalty - Player.loyaltyStatPenaltyForFiring;
+				this.stats.loyalty = Mathf.Clamp(value2, 0f, 20f);
+			}
+		}
+	}
+
+	// Token: 0x060010A9 RID: 4265
+	public bool CanSeeEventWeatherForecast(Championship inChampionship, int inEventNumber)
+	{
+		int num = 1;
+		if (!this.IsUnemployed() && inChampionship.isPlayerChampionship)
+		{
+			if (this.team.perksManager.CheckPerkUnlocked(TeamPerk.Type.ForecastWeather3))
+			{
+				num = 4;
+			}
+			else if (this.team.perksManager.CheckPerkUnlocked(TeamPerk.Type.ForecastWeather2))
+			{
+				num = 3;
+			}
+			else if (this.team.perksManager.CheckPerkUnlocked(TeamPerk.Type.ForecastWeather1))
+			{
+				num = 2;
+			}
+		}
+		return inChampionship.HasSeasonEnded() || inChampionship.eventNumber + num > inEventNumber;
+	}
+
+	// Token: 0x060010AA RID: 4266
+	private void OnWeekEnd()
+	{
+		if (Game.IsActive())
+		{
+			if (!this.IsUnemployed())
+			{
+				float value = this.stats.loyalty + Player.loyaltyStatBonusPerWeek;
+				this.stats.loyalty = Mathf.Clamp(value, 0f, 20f);
+				float value2 = this.stats.financial + ((this.team.financeController.GetTotalAvailableFunds() < 0L) ? (-Player.financialStatChangePerWeek) : Player.financialStatChangePerWeek);
+				this.stats.financial = Mathf.Clamp(value2, 0f, 20f);
+			}
+			this.RemoveOldJobApplications();
+		}
+	}
+
+	// Token: 0x060010AB RID: 4267
+	private void RemoveOldJobApplications()
+	{
+		int num = this.mJobApplications.Count;
+		for (int i = num - 1; i >= 0; i--)
+		{
+			PlayerJobApplication playerJobApplication = this.mJobApplications[i];
+			if ((Game.instance.time.now - playerJobApplication.dateTeamReplied).TotalDays > (double)Player.jobApplicationDaysForRemoval && playerJobApplication.status != PlayerJobApplication.Status.WaitingTeamReply)
+			{
+				if (playerJobApplication.message != null && !playerJobApplication.message.responded)
+				{
+					playerJobApplication.message.SetResponded();
+					playerJobApplication.message.SetPriorityType(Message.Priority.Normal);
+				}
+				this.mJobApplications.Remove(playerJobApplication);
+				num--;
+			}
+		}
+	}
+
+	// Token: 0x060010AC RID: 4268
+	public PlayerJobApplication GetApplication(Team inTeam)
+	{
+		for (int i = this.mJobApplications.Count - 1; i >= 0; i--)
+		{
+			PlayerJobApplication playerJobApplication = this.mJobApplications[i];
+			if (playerJobApplication.team == inTeam)
+			{
+				return playerJobApplication;
+			}
+		}
+		return null;
+	}
+
+	// Token: 0x060010AD RID: 4269
+	public bool CanApproachTeam(Team inTeam)
+	{
+		return !this.hasJoinedTeamRecently && this.canJoinTeam(inTeam);
+	}
+
+	// Token: 0x060010AE RID: 4270
+	public void DecideJobApplication(bool inAccept, Team inTeam)
+	{
+		this.GetApplication(inTeam).SetStatus((!inAccept) ? PlayerJobApplication.Status.Declined : PlayerJobApplication.Status.Accepted);
+		if (inAccept)
+		{
+			Game.instance.player.JoinTeam(inTeam);
+		}
+	}
+
+	// Token: 0x060010AF RID: 4271
+	public bool HasAppliedForTeam(Team inTeam)
+	{
+		int count = this.mJobApplications.Count;
+		for (int i = 0; i < count; i++)
+		{
+			if (this.mJobApplications[i].team == inTeam)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Token: 0x060010B0 RID: 4272
+	public void SendJobApplication(Team inTeam)
+	{
+		if (!this.IsUnemployed())
+		{
+			this.ApplyLoyaltyChange(Player.LoyaltyChange.ApplyingOtherTeam);
+		}
+		if (App.instance.gameStateManager.currentState is FrontendState)
+		{
+			StringVariableParser.teamAppliedTo = inTeam;
+			FeedbackPopup.Open(Localisation.LocaliseID("PSG_10007170", null), Localisation.LocaliseID("PSG_10007171", null));
+		}
+		PlayerJobApplication playerJobApplication = new PlayerJobApplication();
+		playerJobApplication.Setup(Game.instance.time.now, inTeam);
+		this.mJobApplications.Add(playerJobApplication);
+		if (playerJobApplication.inPreSeason)
+		{
+			Game.instance.dialogSystem.OnPlayerJobApplicationPreSeasonReceived(inTeam.chairman);
+		}
+		else
+		{
+			Game.instance.dialogSystem.OnPlayerJobApplicationReceived(inTeam.chairman);
+		}
+		if (UIManager.instance.currentScreen is TeamScreen)
+		{
+			TeamScreen screen = UIManager.instance.GetScreen<TeamScreen>();
+			UIManager.instance.RefreshCurrentPage(screen.team);
+		}
+		if (UIManager.instance.currentScreen is PlayerScreen)
+		{
+			UIManager.instance.RefreshCurrentPage();
+		}
+		Game.instance.challengeManager.NotifyChallengeManagerOfGameEventAndCheckCompletion(ChallengeManager.ChallengeManagerGameEvents.PlayerTryingToLeaveTeam);
+	}
+
+	// Token: 0x060010B1 RID: 4273
+	public bool IsUnemployed()
+	{
+		return this.team is NullTeam;
+	}
+
+	// Token: 0x060010B2 RID: 4274
+	public bool IsInSameChampionship(Person inPerson)
+	{
+		return !this.IsUnemployed() && inPerson.contract.GetTeam() != null && this.team.championship == inPerson.contract.GetTeam().championship;
+	}
+
+	// Token: 0x060010B3 RID: 4275
+	public void JoinTeam(Team inTeam)
+	{
+		if (Game.IsActive() && App.instance.gameStateManager.currentState is FrontendState)
+		{
+			if (!this.IsUnemployed())
+			{
+				Game.instance.MakePlayerUnemployed();
+			}
+			Game.instance.MakePlayerEmployed(inTeam);
+			MovieScreen screen = UIManager.instance.GetScreen<MovieScreen>();
+			screen.PlayTeamMovie(SoundID.Video_TeamLogo, inTeam.teamID);
+			screen.SetNextScreen("PlayerScreen", 1.5f, null);
+			UIManager.instance.ChangeScreen("MovieScreen", UIManager.ScreenTransition.None, 0f, null, UIManager.NavigationType.Normal);
+			UIManager.instance.ClearNavigationStacks();
+			this.UpdatePlayerJoinedTeamAchievements();
+			Game.instance.dialogSystem.SendPlayerRuleDependentMails();
+		}
+	}
+
+	// Token: 0x060010B4 RID: 4276
+	public void AddStartMonthCalendarEvent()
+	{
+		DateTime dateTime = new DateTime(Game.instance.time.now.Year, Game.instance.time.now.Month, 1);
+		DateTime dateTime2 = dateTime.AddMonths(1);
+		CalendarEvent_v1 calendarEvent_v = new CalendarEvent_v1
+		{
+			showOnCalendar = this.IsUnemployed(),
+			category = CalendarEventCategory.None,
+			triggerDate = dateTime2,
+			triggerState = GameState.Type.FrontendState,
+			interruptGameTime = true,
+			OnEventTrigger = MMAction.CreateFromAction(new Action(this.AddStartMonthCalendarEvent)),
+			displayEffect = new PlayerEmployedDisplayEffect
+			{
+				changeDisplay = true,
+				changeInterrupt = true,
+				unemployedCheck = true
+			}
+		};
+		calendarEvent_v.SetDynamicDescription(Localisation.GetEnumLocalisationID(GameUtility.GetMonthAsEnum(dateTime2)));
+		Game.instance.calendar.AddEvent(calendarEvent_v);
+	}
+
+	// Token: 0x060010B5 RID: 4277
+	private void UpdatePlayerJoinedTeamAchievements()
+	{
+		App.instance.steamAchievementsManager.UnlockAchievement(Achievements.AchievementEnum.Get_Hired);
+	}
+
+	// Token: 0x060010B6 RID: 4278
+	public void SetDefaults(PlayerDefaultData inData)
+	{
+		this.nationality = Nationality.GetNationalityByName(inData.defaultNationality);
+		this.dateOfBirth = inData.defaultDateOfBirth;
+		this.gender = inData.defaultGender;
+		this.stats = inData.defaultStats;
+		this.portrait = inData.defaultPortrait;
+		this.LoadOptions();
+	}
+
+	// Token: 0x060010B7 RID: 4279
+	public void LoadDefaultsEntry(ref PlayerDefaultData inData, DatabaseEntry inEntry)
+	{
+		inData.defaultNationality = inEntry.GetStringValue("Nationality");
+		inData.defaultGender = PersonManager<Player>.GetGender(inEntry.GetStringValue("Gender"));
+		inData.defaultStats.raceManagement = inEntry.GetFloatValue("Race Management");
+		inData.defaultStats.financial = inEntry.GetFloatValue("Financial");
+		inData.defaultStats.loyalty = inEntry.GetFloatValue("Loyalty");
+		inData.defaultDateOfBirth = PersonManager<Player>.GetDateOfBirth(inEntry.GetStringValue("DOB"));
+		inData.defaultPortrait = PersonManager<Player>.GetPortrait(inEntry);
+	}
+
+	// Token: 0x060010B8 RID: 4280
+	public Championship.Series GetChampionshipSeries()
+	{
+		if (this.IsUnemployed())
+		{
+			return this.careerHistory.previousTeam.championship.series;
+		}
+		return this.team.championship.series;
+	}
+
+	// Token: 0x170001DF RID: 479
+	// (get) Token: 0x060010B9 RID: 4281
+	public float driverFeedBackStatModifier
+	{
+		get
+		{
+			return this.mPlayerBackStory.driverFeedBackStatModifier;
+		}
+	}
+
+	// Token: 0x170001E0 RID: 480
+	// (get) Token: 0x060010BA RID: 4282
+	public float driverImprovementRateModifier
+	{
+		get
+		{
+			return this.mPlayerBackStory.driverImprovementRateModifier;
+		}
+	}
+
+	// Token: 0x170001E1 RID: 481
+	// (get) Token: 0x060010BB RID: 4283
+	public TimeSpan designPartTimeModifier
+	{
+		get
+		{
+			return this.mPlayerBackStory.designPartTimeModifier;
+		}
+	}
+
+	// Token: 0x170001E2 RID: 482
+	// (get) Token: 0x060010BC RID: 4284
+	public int paymentsModifier
+	{
+		get
+		{
+			return this.mPlayerBackStory.paymentsModifier;
+		}
+	}
+
+	// Token: 0x170001E3 RID: 483
+	// (get) Token: 0x060010BD RID: 4285
+	public int votePowerModifier
+	{
+		get
+		{
+			return this.mPlayerBackStory.votePowerModifier;
+		}
+	}
+
+	// Token: 0x170001E4 RID: 484
+	// (get) Token: 0x060010BE RID: 4286
+	public PlayerBackStory.PlayerBackStoryType playerBackStoryType
+	{
+		get
+		{
+			return this.mPlayerBackStory.playerBackStory;
+		}
+	}
+
+	// Token: 0x170001E5 RID: 485
+	// (get) Token: 0x060010BF RID: 4287
+	public string playerBackStoryString
+	{
+		get
+		{
+			return this.mPlayerBackStory.GetPlayerBackstoryString();
+		}
+	}
+
+	// Token: 0x170001E6 RID: 486
+	// (get) Token: 0x060010C0 RID: 4288
+	public string playerBackStoryDescriptionString
+	{
+		get
+		{
+			return this.mPlayerBackStory.GetPlayerBackstoryDescriptionString();
+		}
+	}
+
+	// Token: 0x170001E7 RID: 487
+	// (get) Token: 0x060010C1 RID: 4289
+	public List<PlayerJobApplication> jobApplications
+	{
+		get
+		{
+			return this.mJobApplications;
+		}
+	}
+
+	// Token: 0x170001E8 RID: 488
+	// (get) Token: 0x060010C2 RID: 4290
+	// (set) Token: 0x060010C3 RID: 4291
+	public Team team
+	{
+		get
+		{
+			return this.mPlayerTeam;
+		}
+		set
+		{
+			this.mPlayerTeam = value;
+		}
+	}
+
+	// Token: 0x170001E9 RID: 489
+	// (get) Token: 0x060010C4 RID: 4292
+	public PromisesController promisesController
+	{
+		get
+		{
+			return this.mPromisesController;
+		}
+	}
+
+	// Token: 0x060010C5 RID: 4293
+public void LoadOptions()
+	{
+		this.rebirthDebug = true;
+		string[] array = File.ReadAllText("config/RebirthOptions.txt").Split(new char[]
+		{
+			'\n'
+		});
+		this.managementBuyoutmanagementBuyoutOn = array[5];
+		this.managementBuyoutMainText = array[8];
+		this.managementBuyoutSubtext = array[11];
+		this.managementBuyoutFullname = array[14];
+		this.managementBuyoutLogoStyle = int.Parse(array[17]);
+		this.managementBuyoutPrimaryColour = array[20];
+		this.managementBuyoutSecondaryColour = array[23];
+		this.jumpStartPercentage = float.Parse(array[33]);
+		this.lockupSensitivity = float.Parse(array[36]);
+		this.crashSensitivity = float.Parse(array[37]);
+		this.spinOutSensitivity = float.Parse(array[38]);
+		this.reduceFormUpdates = int.Parse(array[41]);
+		this.formUpdateSS = int.Parse(array[44]);
+		this.formUpdateGT = int.Parse(array[45]);
+		this.formUpdateE = int.Parse(array[46]);
+		this.weightStrippingMonthStart = int.Parse(array[49]);
+		this.scoutingSlots = int.Parse(array[52]);
+		this.mechanicBonusHide = int.Parse(array[55]);
+		this.weatherReportMod = int.Parse(array[58]);
+		this.harderChairmanObjectives = int.Parse(array[61]);
+		this.instantCarPartFailure = float.Parse(array[64]) * 0.1f / 6f;
+		this.startRebrandNumber = int.Parse(array[71]);
+		this.careerRebrandNumber = float.Parse(array[74]);
+	}
+
+	// Token: 0x04000E88 RID: 3720
+	public const int playerDobMinYear = 1930;
+
+	// Token: 0x04000E89 RID: 3721
+	public const int playerDobMaxYear = 1996;
+
+	// Token: 0x04000E8A RID: 3722
+	public static PlayerDefaultData defaultData = new PlayerDefaultData();
+
+	// Token: 0x04000E8B RID: 3723
+	public static float financialStatChangePerWeek = 0.02f;
+
+	// Token: 0x04000E8C RID: 3724
+	public static float loyaltyStatBonusPerWeek = 0.025f;
+
+	// Token: 0x04000E8D RID: 3725
+	public static float loyaltyStatPenaltyForFiring = 0.2f;
+
+	// Token: 0x04000E8E RID: 3726
+	public static float loyaltyStatPenaltyForApplyingOtherTeam = 0f;
+
+	// Token: 0x04000E8F RID: 3727
+	public static float raceManagementStatMaxChange = 0.25f;
+
+	// Token: 0x04000E90 RID: 3728
+	public static float raceManagementStatPositionMultiplier = 0.05f;
+
+	// Token: 0x04000E91 RID: 3729
+	public static int jobApplicationDaysForRemoval = 30;
+
+	// Token: 0x04000E92 RID: 3730
+	public bool hasSetPortrait;
+
+	// Token: 0x04000E93 RID: 3731
+	public bool hasCreatedTeam;
+
+	// Token: 0x04000E94 RID: 3732
+	public int createdTeamID = -1;
+
+	// Token: 0x04000E95 RID: 3733
+	public TrophyHistory trophyHistory = new TrophyHistory();
+
+	// Token: 0x04000E96 RID: 3734
+	public List<DialogCriteria> dialogSystemGlobalMemoryList = new List<DialogCriteria>();
+
+	// Token: 0x04000E97 RID: 3735
+	public PlayerGameData playerGameData = new PlayerGameData();
+
+	// Token: 0x04000E98 RID: 3736
+	private Team mPlayerTeam;
+
+	// Token: 0x04000E99 RID: 3737
+	private List<PlayerJobApplication> mJobApplications = new List<PlayerJobApplication>();
+
+	// Token: 0x04000E9A RID: 3738
+	private PlayerBackStory mPlayerBackStory = new PlayerBackStory();
+
+	// Token: 0x04000E9B RID: 3739
+	private PromisesController mPromisesController = new PromisesController();
+
+	// Token: 0x04000E9C RID: 3740
+	public bool rebirthDebug;
+
+	// Token: 0x04000E9D RID: 3741
+	public string managementBuyoutmanagementBuyoutOn;
+
+	// Token: 0x04000E9E RID: 3742
+	public string managementBuyoutMainText;
+
+	// Token: 0x04000E9F RID: 3743
+	public string managementBuyoutSubtext;
+
+	// Token: 0x04000EA0 RID: 3744
+	public string managementBuyoutPrimaryColour;
+
+	// Token: 0x04000EA1 RID: 3745
+	public string managementBuyoutSecondaryColour;
+
+	// Token: 0x04000EA2 RID: 3746
+	public string managementBuyoutFullname;
+
+	// Token: 0x04000EA3 RID: 3747
+	public bool skipraceweekends;
+
+	// Token: 0x04000EA4 RID: 3748
+	public int managementBuyoutLogoStyle;
+
+	// Token: 0x04000EA5 RID: 3749
+	public float jumpStartPercentage;
+
+	// Token: 0x04000EA6 RID: 3750
+	public int debugValue;
+
+	// Token: 0x04000EA7 RID: 3751
+	public float lockupSensitivity;
+
+	// Token: 0x04000EA8 RID: 3752
+	public float crashSensitivity;
+
+	// Token: 0x04000EA9 RID: 3753
+	public float spinOutSensitivity;
+
+	// Token: 0x04000EAA RID: 3754
+	public int reduceFormUpdates;
+
+	// Token: 0x04000EAB RID: 3755
+	public int formUpdateSS;
+
+	// Token: 0x04000EAC RID: 3756
+	public int formUpdateGT;
+
+	// Token: 0x04000EAD RID: 3757
+	public int formUpdateE;
+
+	// Token: 0x04000EAE RID: 3758
+	public int weightStrippingMonthStart;
+
+	// Token: 0x04000EAF RID: 3759
+	public int scoutingSlots;
+
+	// Token: 0x04000EB0 RID: 3760
+	public int mechanicBonusHide;
+
+	// Token: 0x04000EB1 RID: 3761
+	public int weatherReportMod;
+
+	// Token: 0x04000EB2 RID: 3762
+	public int harderChairmanObjectives;
+
+	// Token: 0x04000EB3 RID: 3763
+	public float instantCarPartFailure;
+
+	// Token: 0x04004FD5 RID: 20437
+	public int startRebrandNumber;
+
+	// Token: 0x04004FD6 RID: 20438
+	public float careerRebrandNumber;
+
+	// Token: 0x0200023B RID: 571
+	public enum LoyaltyChange
+	{
+		// Token: 0x04000EB5 RID: 3765
+		FiringTeamMember,
+		// Token: 0x04000EB6 RID: 3766
+		ApplyingOtherTeam
+	}
+}

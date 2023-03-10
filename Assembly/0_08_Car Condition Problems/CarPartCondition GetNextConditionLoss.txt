@@ -1,0 +1,73 @@
+using System;
+using System.Collections.Generic;
+using FullSerializer;
+using UnityEngine;
+
+// Token: 0x020000FB RID: 251
+[fsObject(MemberSerialization = fsMemberSerialization.OptOut)]
+public partial class CarPartCondition
+{
+	// Token: 0x060005A0 RID: 1440
+	public float GetNextConditionLoss(float inCondition, CarPart.PartType inType, RacingVehicle inVehicle)
+	{
+		if (this.BonusConditionLossPrevented() || inVehicle.timer.hasSeenChequeredFlag || inVehicle.behaviourManager.isOutOfRace)
+		{
+			return 0f;
+		}
+		float num = 0f;
+		float random = RandomUtility.GetRandom01();
+		if (random >= Game.instance.player.instantCarPartFailure)
+		{
+			if (inCondition > this.redZone)
+			{
+				num = RandomUtility.GetRandom(0.01f, 0.08f) + (0.015f - inVehicle.driver.GetDriverStats().smoothness / 1000f);
+			}
+			else if (inCondition > 0f)
+			{
+				num = RandomUtility.GetRandom(0.05f, 0.15f) + (0.03f - inVehicle.driver.GetDriverStats().smoothness / 500f);
+			}
+		}
+		if (random < Game.instance.player.instantCarPartFailure)
+		{
+			if (inCondition > this.redZone)
+			{
+				num = 1f;
+			}
+			else if (inCondition > 0f)
+			{
+				num = 1f;
+			}
+		}
+		if (inVehicle.bonuses.IsBonusActive(MechanicBonus.Trait.Nurse))
+		{
+			num *= 0.75f;
+		}
+		if (inType == CarPart.PartType.Engine)
+		{
+			if (inVehicle.bonuses.IsBonusActive(MechanicBonus.Trait.EngineExpert))
+			{
+				num *= 0.75f;
+			}
+			else
+			{
+				switch (inVehicle.performance.fuel.engineMode)
+				{
+				case Fuel.EngineMode.SuperOvertake:
+				case Fuel.EngineMode.Overtake:
+					num *= 1.6f;
+					break;
+				case Fuel.EngineMode.High:
+					num *= 1.2f;
+					break;
+				case Fuel.EngineMode.Medium:
+					num *= 1f;
+					break;
+				case Fuel.EngineMode.Low:
+					num *= 0.5f;
+					break;
+				}
+			}
+		}
+		return num * this.GetLossBonusForCircuitStatRelevancy(inType, inVehicle);
+	}
+}
